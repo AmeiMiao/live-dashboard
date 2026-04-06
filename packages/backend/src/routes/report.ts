@@ -2,9 +2,36 @@ import { authenticateToken } from "../middleware/auth";
 import { resolveAppName } from "../services/app-mapper";
 import { isNSFW } from "../services/nsfw-filter";
 import { processDisplayTitle } from "../services/privacy-tiers";
-import { insertActivity, upsertDeviceState, hmacTitle, getAllDeviceStates, insertHealthRecord } from "../db";
+import { insertActivity, upsertDeviceState, hmacTitle, getDeviceStateById, insertHealthRecord } from "../db";
 
 const MAX_TITLE_LENGTH = 256;
+
+function parseClientTimestamp(rawTimestamp: unknown): string | null {
+  let ts: Date | null = null;
+
+  if (typeof rawTimestamp === "string" && rawTimestamp) {
+    const parsed = new Date(rawTimestamp);
+    if (!isNaN(parsed.getTime())) {
+      ts = parsed;
+    }
+  } else if (typeof rawTimestamp === "number" && Number.isFinite(rawTimestamp)) {
+    // Accept both Unix seconds and milliseconds from clients.
+    const epochMs = rawTimestamp < 1e12 ? rawTimestamp * 1000 : rawTimestamp;
+    const parsed = new Date(epochMs);
+    if (!isNaN(parsed.getTime())) {
+      ts = parsed;
+    }
+  }
+
+  if (!ts) return null;
+
+  const now = Date.now();
+  if (Math.abs(ts.getTime() - now) >= 5 * 60 * 1000) {
+    return null;
+  }
+
+  return ts.toISOString();
+}
 
 function parseExtraJson(extra: unknown): Record<string, unknown> {
   if (typeof extra !== "string" || !extra) return {};
@@ -79,19 +106,7 @@ export async function handleReport(req: Request): Promise<Response> {
   }
 
   // Validate client timestamp (optional, used for display only)
-  let startedAt: string;
-  if (typeof body.timestamp === "string" && body.timestamp) {
-    const ts = new Date(body.timestamp);
-    const now = Date.now();
-    // Accept if within ±5 minutes, otherwise use server time
-    if (!isNaN(ts.getTime()) && Math.abs(ts.getTime() - now) < 5 * 60 * 1000) {
-      startedAt = ts.toISOString();
-    } else {
-      startedAt = new Date().toISOString();
-    }
-  } else {
-    startedAt = new Date().toISOString();
-  }
+  const startedAt = parseClientTimestamp(body.timestamp) || new Date().toISOString();
 
   // NSFW filter - silently discard
   if (isNSFW(appId, windowTitle)) {
@@ -113,8 +128,7 @@ export async function handleReport(req: Request): Promise<Response> {
   let mergedExtra = incomingExtra;
   let existingExtra: Record<string, unknown> = {};
   try {
-    const deviceStates = await getAllDeviceStates();
-    const existingState = deviceStates.find((state: any) => state.device_id === device.device_id);
+    const existingState = await getDeviceStateById(device.device_id);
     if (existingState) {
       existingExtra = parseExtraJson(existingState.extra);
       mergedExtra = { ...existingExtra, ...incomingExtra };

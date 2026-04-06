@@ -1,6 +1,7 @@
 import { resolve, normalize, relative, sep } from "node:path";
 import { realpathSync } from "node:fs";
 import { realpath as realpathAsync } from "node:fs/promises";
+import { dbReady } from "./db";
 import { handleReport } from "./routes/report";
 import { handleCurrent } from "./routes/current";
 import { handleTimeline } from "./routes/timeline";
@@ -41,6 +42,8 @@ async function serveStaticFile(realFile: string): Promise<Response> {
 
   return new Response(Bun.file(realFile));
 }
+
+await dbReady;
 
 const server = Bun.serve({
   port: LISTEN_PORT,

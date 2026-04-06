@@ -63,8 +63,9 @@ async function initDB() {
   console.log("[db] Database initialized");
 }
 
-// Run initialization
-initDB().catch((e) => {
+export const dbReady = initDB();
+
+dbReady.catch((e) => {
   console.error("[db] Init failed:", e);
   process.exit(1);
 });
@@ -135,6 +136,14 @@ export async function upsertDeviceState(
 export async function getAllDeviceStates() {
   const result = await db.execute("SELECT * FROM device_states ORDER BY last_seen_at DESC");
   return result.rows;
+}
+
+export async function getDeviceStateById(deviceId: string) {
+  const result = await db.execute({
+    sql: "SELECT * FROM device_states WHERE device_id = ? LIMIT 1",
+    args: [deviceId],
+  });
+  return result.rows[0] ?? null;
 }
 
 export async function getRecentActivities() {
