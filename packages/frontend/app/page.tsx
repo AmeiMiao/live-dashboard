@@ -81,6 +81,14 @@ function HomeInner() {
     };
   }, [timeline, selectedDevice]);
 
+  const showHealthTab = selectedDevice?.platform === "android";
+
+  useEffect(() => {
+    if (!showHealthTab && tab === "health") {
+      setTab("activity");
+    }
+  }, [showHealthTab, tab]);
+
   useEffect(() => {
     document.body.classList.toggle("night-mode", allOffline);
     return () => { document.body.classList.remove("night-mode"); };
@@ -161,16 +169,18 @@ function HomeInner() {
                   >
                     活动
                   </button>
-                  <button
-                    onClick={() => setTab("health")}
-                    className={`pill-btn text-xs px-3 py-1 ${
-                      tab === "health"
-                        ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]"
-                        : ""
-                    }`}
-                  >
-                    健康
-                  </button>
+                  {showHealthTab && (
+                    <button
+                      onClick={() => setTab("health")}
+                      className={`pill-btn text-xs px-3 py-1 ${
+                        tab === "health"
+                          ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]"
+                          : ""
+                      }`}
+                    >
+                      健康
+                    </button>
+                  )}
                 </div>
               </div>
 
