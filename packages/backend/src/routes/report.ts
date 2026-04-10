@@ -70,8 +70,13 @@ function sanitizeExtra(bodyExtra: any): Record<string, unknown> {
     if (typeof rawMusic.title === "string") music.title = rawMusic.title.slice(0, 256);
     if (typeof rawMusic.artist === "string") music.artist = rawMusic.artist.slice(0, 256);
     if (typeof rawMusic.app === "string") music.app = rawMusic.app.slice(0, 64);
-    if (Object.keys(music).length > 0) {
+    // Check if music has any non-empty values
+    const hasNonEmptyMusic = Object.values(music).some(v => v.length > 0);
+    if (hasNonEmptyMusic) {
       extra.music = music;
+    } else if (Object.keys(music).length > 0) {
+      // All values are empty strings — explicitly mark music for clearing
+      extra.music = null;
     }
   }
 
@@ -132,6 +137,10 @@ export async function handleReport(req: Request): Promise<Response> {
     if (existingState) {
       existingExtra = parseExtraJson(existingState.extra);
       mergedExtra = { ...existingExtra, ...incomingExtra };
+      // If incoming explicitly set music to null, clear it from merged result
+      if ("music" in incomingExtra && incomingExtra.music === null) {
+        delete mergedExtra.music;
+      }
     }
   } catch (e: any) {
     console.warn("[report] Failed to load existing extra, using incoming extra only:", e.message);
